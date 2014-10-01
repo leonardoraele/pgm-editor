@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.LinkedList;
+import java.util.NoSuchElementException;
 import java.util.Scanner;
 
 import javax.swing.BoxLayout;
@@ -98,9 +99,8 @@ public class PGMGUI {
 		
 		// Setup "Edit" menu
 		this.editMenu = new JMenu("Editar");
-		//this.editMenu.add(new MenuItemBindToMethod(this, "commandUndo", "Desfazer"));
-		//this.editMenu.add(new MenuItemBindToMethod(this, "commandRedo", "Refazer"));
-		this.editMenu.add(new MenuItemBindToMethod(this, "commandMove", "Mover imagem"));
+		this.editMenu.add(new MenuItemBindToMethod(this, "commandUndo", "Desfazer"));
+		this.editMenu.add(new MenuItemBindToMethod(this, "commandRedo", "Refazer"));
 		
 		// Setup "Apply Effect" menu
 		this.effectMenu = new JMenu("Aplicar Efeito");
@@ -121,7 +121,7 @@ public class PGMGUI {
 		// Setup Menu bar
 		this.menuBar = new JMenuBar();
 		this.menuBar.add(this.fileMenu);
-		//this.menuBar.add(this.editMenu);
+		this.menuBar.add(this.editMenu);
 		this.menuBar.add(this.effectMenu);
 		
 		// Setup original image's container
@@ -153,13 +153,6 @@ public class PGMGUI {
 	
 	public void load(PGM image)
 	{
-		/*
-		this.originalImageDrawer = new PGMDrawer(new PGM(image));
-		this.originalContainer.removeAll();
-		this.originalContainer.add(this.originalImageDrawer, BorderLayout.CENTER);
-		this.originalContainer.add(new JLabel(LABEL_ORIGINAL_IMAGE), BorderLayout.SOUTH);
-		 */
-		
 		this.generatedImageDrawer = new PGMDrawer(image);
 		this.generatedContainer.removeAll();
 		this.generatedContainer.add(this.generatedImageDrawer, BorderLayout.CENTER);
@@ -173,7 +166,7 @@ public class PGMGUI {
 		this.history.clear();
 		this.undoneChanges.clear();
 		this.frame.setSize(image.getWidth() * 2 + 4, image.getHeight() + 24);
-		this.frame.layout();
+		this.frame.invalidate();
 		SwingUtil.centralizeWindow(this.frame);
 	}
 	
@@ -237,13 +230,13 @@ public class PGMGUI {
 	
 	public void commandReset()
 	{
-		if (this.originalImageDrawer != null && this.generatedImageDrawer != null)
+		if (this.histogramDrawer != null && this.generatedImageDrawer != null)
 		{
 			PGM originalImage = this.originalImageDrawer.getImage();
 			PGM newGeneratedImage = new PGM(originalImage);
-			this.generatedImageDrawer.setImage(newGeneratedImage);
 			
-			if (this.histogramDrawer != null) this.histogramDrawer.setImage(newGeneratedImage);
+			this.generatedImageDrawer.setImage(newGeneratedImage);
+			this.histogramDrawer.setImage(newGeneratedImage);
 		}
 	}
 	
@@ -258,13 +251,13 @@ public class PGMGUI {
 	{
 		if (this.generatedImageDrawer != null)
 		{
-			PGM currentImage = this.generatedImageDrawer.getImage();
-			PGM lastChange = this.history.pop();
-			if (lastChange != null)
-			{
-				this.generatedImageDrawer.setImage(lastChange);
+			try {
+				PGM lastChange = this.history.pop();
+				PGM currentImage = this.generatedImageDrawer.getImage();
+
+				this.generatedImageDrawer.setImage(new PGM(lastChange));
 				this.undoneChanges.push(currentImage);
-			}
+			} catch (NoSuchElementException e) {}
 		}
 	}
 	
@@ -272,27 +265,13 @@ public class PGMGUI {
 	{
 		if (this.generatedImageDrawer != null)
 		{
-			PGM currentImage = this.generatedImageDrawer.getImage();
-			PGM lastUndoneChange = this.undoneChanges.pop();
-			if (lastUndoneChange != null)
-			{
-				this.generatedImageDrawer.setImage(lastUndoneChange);
+			try {
+				PGM lastUndoneChange = this.undoneChanges.pop();
+				PGM currentImage = this.generatedImageDrawer.getImage();
+				
+				this.generatedImageDrawer.setImage(new PGM(lastUndoneChange));
 				this.history.push(currentImage);
-			}
-		}
-	}
-	
-	public void commandMove()
-	{
-		if (this.generatedImageDrawer != null)
-		{
-			String inputX = JOptionPane.showInputDialog("Movimento X");
-			int x = Integer.valueOf(inputX);
-			String inputY = JOptionPane.showInputDialog("Movimento Y");
-			int y = Integer.valueOf(inputY);
-			
-			this.generatedImageDrawer.getImage().moveImage(x, y);
-			this.frame.repaint();
+			} catch (NoSuchElementException e) {}
 		}
 	}
 	
@@ -307,6 +286,8 @@ public class PGMGUI {
 			
 			this.generatedImageDrawer.getImage().applyBrightness(value);
 			this.frame.repaint();
+			
+			this.registerHistory();
 		}
 	}
 	

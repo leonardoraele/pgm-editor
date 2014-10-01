@@ -14,6 +14,8 @@ public class CenterOfHistogramBinarity implements BinarityAlgorithm {
 		int min = scale.getFirst();
 		int max = scale.getSecond();
 		
+		max -= 10;
+		
 		int result = min + (max - min) / 2;
 		
 		return result;
