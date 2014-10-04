@@ -4,8 +4,8 @@ import java.awt.BorderLayout;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.LinkedList;
-import java.util.NoSuchElementException;
 import java.util.Scanner;
 
 import javax.swing.BoxLayout;
@@ -13,6 +13,7 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 
@@ -49,7 +50,6 @@ public class PGMGUI {
 	}
 	
 	private static final String TITLE = "Aboshop";
-	private static final String LABEL_ORIGINAL_IMAGE = "Imagem original";
 	private static final String LABEL_GENERATED_IMAGE = "Nova imagem";
 	
 	private JFrame frame;
@@ -62,10 +62,11 @@ public class PGMGUI {
 	private JMenu editMenu;
 	private PGMDrawer originalImageDrawer;
 	private PGMDrawer generatedImageDrawer;
-	private LinkedList<PGM> history;
-	private LinkedList<PGM> undoneChanges;
-	private JPanel generatedHistogramContainer;
 	private HistogramDrawer histogramDrawer;
+	private ArrayDeque<PGM> history;
+	private ArrayDeque<PGM> undoneChanges;
+	private JMenuItem undoItem;
+	private JMenuItem redoItem;
 	
 	public PGMGUI(PGM image)
 	{
@@ -87,8 +88,8 @@ public class PGMGUI {
 	public PGMGUI(boolean initiallyVisible)
 	{
 		// Setup inner attributes
-		this.history = new LinkedList<PGM>();
-		this.undoneChanges = new LinkedList<PGM>();
+		this.history = new ArrayDeque<PGM>();
+		this.undoneChanges = new ArrayDeque<PGM>();
 		
 		// Setup "File" menu
 		this.fileMenu = new JMenu("Arquivo");
@@ -99,22 +100,22 @@ public class PGMGUI {
 		
 		// Setup "Edit" menu
 		this.editMenu = new JMenu("Editar");
-		this.editMenu.add(new MenuItemBindToMethod(this, "commandUndo", "Desfazer"));
-		this.editMenu.add(new MenuItemBindToMethod(this, "commandRedo", "Refazer"));
+		this.editMenu.add(this.undoItem = new MenuItemBindToMethod(this, "commandUndo", "Desfazer"));
+		this.editMenu.add(this.redoItem = new MenuItemBindToMethod(this, "commandRedo", "Refazer"));
 		
 		// Setup "Apply Effect" menu
 		this.effectMenu = new JMenu("Aplicar Efeito");
 		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplyBrightness", "Brilho..."));
 		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplyContrast", "Contraste..."));
 		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplyNegative", "Negativar"));
-		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplyExpansionFixed", "Expans√£o do Histograma (completar histograma)"));
-		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplyExpansionScale", "Expans√£o do Histograma... (especificar escala)"));
-		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplyEqualization", "Equaliza√ß√£o do Histograma"));
-		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplySpecification", "Especifica√ß√£o do Histograma..."));
+		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplyExpansionFixed", "Expans„o do Histograma (completar histograma)"));
+		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplyExpansionScale", "Expans„o do Histograma... (especificar escala)"));
+		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplyEqualization", "EqualizaÁ„o do Histograma"));
+		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplySpecification", "EspecificaÁ„o do Histograma..."));
 		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplyFilter", "Filtro..."));
-		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplyBinarization", "Binariza√ß√£o..."));
-		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplyDilatation", "Dilata√ß√£o..."));
-		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplyErosion", "Eros√£o..."));
+		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplyBinarization", "BinarizaÁ„o..."));
+		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplyDilatation", "DilataÁ„o..."));
+		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplyErosion", "ErosÁ„o..."));
 		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplyOpenning", "Abertura..."));
 		this.effectMenu.add(new MenuItemBindToMethod(this, "commandApplyClosing", "Fechamento..."));
 		
@@ -131,9 +132,6 @@ public class PGMGUI {
 		// Setup new image's container
 		this.generatedContainer = new JPanel();
 		this.generatedContainer.setLayout(new BorderLayout());
-		
-		// Setup new image histogram's container
-		this.generatedHistogramContainer = new JPanel();
 		
 		// Setup a container with both images
 		this.bothContainer = new JPanel();
@@ -164,7 +162,9 @@ public class PGMGUI {
 		this.originalContainer.add(new JLabel("Histograma"), BorderLayout.SOUTH);
 		
 		this.history.clear();
+		this.undoItem.setEnabled(false);
 		this.undoneChanges.clear();
+		this.redoItem.setEnabled(false);
 		this.frame.setSize(image.getWidth() * 2 + 4, image.getHeight() + 24);
 		this.frame.invalidate();
 		SwingUtil.centralizeWindow(this.frame);
@@ -175,16 +175,29 @@ public class PGMGUI {
 		return this.frame;
 	}
 	
-	public void commandNotSupported()
+	private void commandNotSupported()
 	{
 		JOptionPane.showMessageDialog(null, "This feature is not supported by PGMGUI yet.", "Information", JOptionPane.INFORMATION_MESSAGE);
 	}
 	
-	public void registerHistory()
+	private void registerHistory()
 	{
 		PGM generatedImage = PGMGUI.this.generatedImageDrawer.getImage();
-		this.history.push(new PGM(generatedImage));
+		PGM copy = new PGM(generatedImage);
+		this.history.push(copy);
+		this.undoItem.setEnabled(true);
 		this.undoneChanges.clear();
+		this.redoItem.setEnabled(false);
+	}
+
+	private void rollBackHistory() {
+		this.commandUndo();
+		
+		if (!this.undoneChanges.isEmpty())
+		{
+			this.undoneChanges.pop();
+			this.undoItem.setEnabled(!this.undoneChanges.isEmpty());
+		}
 	}
 	
 	/////////////////////////// MENUBAR:FILE ///////////////////////////////////
@@ -237,6 +250,9 @@ public class PGMGUI {
 			
 			this.generatedImageDrawer.setImage(newGeneratedImage);
 			this.histogramDrawer.setImage(newGeneratedImage);
+
+			this.undoItem.setEnabled(false);
+			this.redoItem.setEnabled(false);
 		}
 	}
 	
@@ -251,13 +267,20 @@ public class PGMGUI {
 	{
 		if (this.generatedImageDrawer != null)
 		{
-			try {
-				PGM lastChange = this.history.pop();
+			if (!this.history.isEmpty())
+			{
 				PGM currentImage = this.generatedImageDrawer.getImage();
-
-				this.generatedImageDrawer.setImage(new PGM(lastChange));
-				this.undoneChanges.push(currentImage);
-			} catch (NoSuchElementException e) {}
+				this.undoneChanges.add(currentImage);
+				this.redoItem.setEnabled(true);
+				
+				PGM registeredImage = this.history.pop();
+				this.generatedImageDrawer.setImage(registeredImage);
+				
+				if (this.history.isEmpty())
+				{
+					this.undoItem.setEnabled(false);
+				}
+			}
 		}
 	}
 	
@@ -265,13 +288,20 @@ public class PGMGUI {
 	{
 		if (this.generatedImageDrawer != null)
 		{
-			try {
-				PGM lastUndoneChange = this.undoneChanges.pop();
+			if (!this.undoneChanges.isEmpty())
+			{
 				PGM currentImage = this.generatedImageDrawer.getImage();
-				
-				this.generatedImageDrawer.setImage(new PGM(lastUndoneChange));
 				this.history.push(currentImage);
-			} catch (NoSuchElementException e) {}
+				this.undoItem.setEnabled(true);
+				
+				PGM undoneImage = this.undoneChanges.pop();
+				this.generatedImageDrawer.setImage(undoneImage);
+				
+				if (this.undoneChanges.isEmpty())
+				{
+					this.redoItem.setEnabled(false);
+				}
+			}
 		}
 	}
 	
@@ -282,12 +312,28 @@ public class PGMGUI {
 		if (this.generatedImageDrawer != null)
 		{
 			String input = JOptionPane.showInputDialog("Quantidade de brilho (-250, 250)");
-			int value = Integer.valueOf(input);
 			
-			this.generatedImageDrawer.getImage().applyBrightness(value);
-			this.frame.repaint();
-			
-			this.registerHistory();
+			if (input != null)
+			{
+				Integer value;
+				try {
+					value = Integer.valueOf(input);
+				} catch (NumberFormatException e) {
+					value = null;
+					
+					JOptionPane.showMessageDialog(null, e);
+				};
+				
+				if (value != null)
+				{
+					this.registerHistory();
+					
+					PGM generatedImage = this.generatedImageDrawer.getImage();
+					generatedImage.applyBrightness(value);
+					this.frame.repaint();
+				}
+
+			}
 		}
 	}
 	
@@ -296,10 +342,26 @@ public class PGMGUI {
 		if (this.generatedImageDrawer != null)
 		{
 			String input = JOptionPane.showInputDialog("Valor de contraste (0, 2)");
-			double value = Double.valueOf(input);
 			
-			this.generatedImageDrawer.getImage().applyContrast(value);
-			this.frame.repaint();
+			if (input != null)
+			{
+				Double value;
+				try {
+					value = Double.valueOf(input);
+				} catch (NumberFormatException e) {
+					value = null;
+					
+					JOptionPane.showMessageDialog(null, e);
+				};
+				
+				if (value != null)
+				{
+					this.registerHistory();
+					
+					this.generatedImageDrawer.getImage().applyContrast(value);
+					this.frame.repaint();
+				}
+			}
 		}
 	}
 	
@@ -307,6 +369,8 @@ public class PGMGUI {
 	{
 		if (this.generatedImageDrawer != null)
 		{
+			this.registerHistory();
+			
 			this.generatedImageDrawer.getImage().applyNegative();
 			this.frame.repaint();
 		}
@@ -316,6 +380,8 @@ public class PGMGUI {
 	{
 		if (this.generatedImageDrawer != null)
 		{
+			this.registerHistory();
+			
 			this.generatedImageDrawer.getImage().applyHistogramExpansion();
 			this.frame.repaint();
 		}
@@ -325,10 +391,12 @@ public class PGMGUI {
 	{
 		if (this.generatedImageDrawer != null)
 		{
+			// TODO registerHistory
+			
 			int pixelLimit = this.generatedImageDrawer.getImage().getPixelLimit();
 			
 			int from = Integer.valueOf(JOptionPane.showInputDialog("Valor do menor pixel (de)", 0));
-			int to = Integer.valueOf(JOptionPane.showInputDialog("Valor do maior pixel (at√©)", pixelLimit));
+			int to = Integer.valueOf(JOptionPane.showInputDialog("Valor do maior pixel (atÈ)", pixelLimit));
 			
 			Pair<Integer, Integer> newScale = new Pair<Integer, Integer>(from, to);
 			
@@ -341,6 +409,8 @@ public class PGMGUI {
 	{
 		if (this.generatedImageDrawer != null)
 		{
+			this.registerHistory();
+			
 			PGM image = this.generatedImageDrawer.getImage();
 			image.applyHistogramEqualization();
 			this.frame.repaint();
@@ -351,23 +421,198 @@ public class PGMGUI {
 	{
 		if (this.generatedImageDrawer != null)
 		{
-			Object strategy = JOptionPane.showInputDialog(null, "Algor√≠tmo de binariza√ß√£o", "Binariza√ß√£o", JOptionPane.QUESTION_MESSAGE, null, getClassList("binarityAlgorithms.conf"), null);
+			BinarityAlgorithm algorithm = AlgorithmSelectorDialog.selectBinarityAlgorithm();
 			
-			if (strategy != null)
+			if (algorithm != null)
 			{
 				try {
-					@SuppressWarnings("unchecked")
-					BinarityAlgorithm algorithm = ((Class<? extends BinarityAlgorithm>) strategy).newInstance();
-					
+					this.registerHistory();
 					this.generatedImageDrawer.getImage().applyBinarity(algorithm);
 					this.frame.repaint();
 				} catch (Exception e) {
-					JOptionPane.showMessageDialog(null, e.getMessage());
+					JOptionPane.showMessageDialog(null, e);
+					this.rollBackHistory();
+				}
+			}
+		}
+	}
+
+	public void commandApplyDilatation()
+	{
+		if (this.generatedImageDrawer != null)
+		{
+			String input = JOptionPane.showInputDialog("Quantidade de dilata√ß√£o (>= 1)");
+			
+			if (input != null)
+			{
+				Integer value;
+				try {
+					value = Integer.valueOf(input);
+				} catch (NumberFormatException e) {
+					value = null;
+					
+					JOptionPane.showMessageDialog(null, e);
+				};
+				
+				if (value != null)
+				{
+					this.registerHistory();
+					
+					this.generatedImageDrawer.getImage().applyDilatation(value);
+					this.frame.repaint();
 				}
 			}
 		}
 	}
 	
+	public void commandApplyErosion()
+	{
+		if (this.generatedImageDrawer != null)
+		{
+			String input = JOptionPane.showInputDialog("Quantidade de eros√£o (>= 1)");
+			
+			if (input != null)
+			{
+				Integer value;
+				try {
+					value = Integer.valueOf(input);
+				} catch (NumberFormatException e) {
+					value = null;
+					
+					JOptionPane.showMessageDialog(null, e);
+				};
+				
+				if (value != null)
+				{
+					this.registerHistory();
+					
+					this.generatedImageDrawer.getImage().applyErosion(value);
+					this.frame.repaint();
+				}
+			}
+		}
+	}
+	
+	public void commandApplyOpenning()
+	{
+		if (this.generatedImageDrawer != null)
+		{
+			String input = JOptionPane.showInputDialog("Quantidade de abertura (>= 1)");
+			
+			if (input != null)
+			{
+				Integer value;
+				try {
+					value = Integer.valueOf(input);
+				} catch (NumberFormatException e) {
+					value = null;
+					
+					JOptionPane.showMessageDialog(null, e);
+				};
+				
+				if (value != null)
+				{
+					this.registerHistory();
+					
+					this.generatedImageDrawer.getImage().applyOpenning(value);
+					this.frame.repaint();
+				}
+			}
+		}
+	}
+	
+	public void commandApplyClosing()
+	{
+		if (this.generatedImageDrawer != null)
+		{
+			String input = JOptionPane.showInputDialog("Quantidade de fechamento (>= 1)");
+			
+			if (input != null)
+			{
+				Integer value;
+				try {
+					value = Integer.valueOf(input);
+				} catch (NumberFormatException e) {
+					value = null;
+					
+					JOptionPane.showMessageDialog(null, e);
+				};
+				
+				if (value != null)
+				{
+					this.registerHistory();
+					
+					this.generatedImageDrawer.getImage().applyClosing(value);
+					this.frame.repaint();
+				}
+			}
+		}
+	}
+	
+	public void commandApplySpecification()
+	{
+		if (this.generatedImageDrawer != null)
+		{
+			String input = JOptionPane.showInputDialog("Imagem do histograma especificado.");
+			
+			if (input != null)
+			{
+				try {
+					this.registerHistory();
+					int[] histogram = new PGM(input).getHistogram();
+					this.generatedImageDrawer.getImage().applyHistogramSpecification(histogram);
+					this.frame.repaint();
+				} catch (FileNotFoundException e) {
+					JOptionPane.showMessageDialog(null, "Arquivo n√£o encontrado.", "Erro", JOptionPane.ERROR_MESSAGE);
+					this.rollBackHistory();
+				}
+			}
+		}
+	}
+	
+	public void commandApplyFilter()
+	{
+		if (this.generatedImageDrawer != null)
+		{
+			// TODO registerHistory
+			
+			String input = JOptionPane.showInputDialog("Tamanho do filtro?");
+			Integer filterSize = Integer.valueOf(input);
+			
+			int[][] filter = FilterEditor.getFilter(this.frame, "Filtro", filterSize);
+			
+			if (filter != null)
+			{
+				Object strategy = JOptionPane.showInputDialog(null, "AlgorÌtmo de tratamento de bordas", "Tratamento de bordas", JOptionPane.QUESTION_MESSAGE, null, getClassList("filterAlgorithms.conf"), null);
+				
+				if (strategy != null)
+				{
+					String repeatString = JOptionPane.showInputDialog("RepetiÁıes", "1");
+					Integer repeatInteger;
+					
+					try {
+						repeatInteger = Integer.parseInt(repeatString);
+					} catch (NumberFormatException e) {
+						repeatInteger = 0;
+					}
+					
+					while (repeatInteger-- > 0)
+					{
+						try {
+							@SuppressWarnings("unchecked")
+							BorderTreatmentStrategy algorithm = ((Class<? extends BorderTreatmentStrategy>) strategy).newInstance();
+							
+							this.generatedImageDrawer.getImage().applyFilter(filter, algorithm);
+							this.frame.repaint();
+						} catch (Exception e) {
+							JOptionPane.showMessageDialog(null, e.getMessage());
+						}
+					}
+				}
+			}
+		}
+	}
+
 	private Class<?>[] getClassList(String filename)
 	{
 		LinkedList<Class<?>> classes = new LinkedList<Class<?>>();
@@ -395,102 +640,6 @@ public class PGMGUI {
 		}
 		
 		return classes.toArray(new Class<?>[classes.size()]);
-	}
-
-	public void commandApplyDilatation()
-	{
-		if (this.generatedImageDrawer != null)
-		{
-			String input = JOptionPane.showInputDialog("Quantidade de dilata√ß√£o (>= 1)");
-			int value = Integer.valueOf(input);
-			
-			this.generatedImageDrawer.getImage().applyDilatation(value);
-			this.frame.repaint();
-		}
-	}
-	
-	public void commandApplyErosion()
-	{
-		if (this.generatedImageDrawer != null)
-		{
-			String input = JOptionPane.showInputDialog("Quantidade de eros√£o (>= 1)");
-			int value = Integer.valueOf(input);
-			
-			this.generatedImageDrawer.getImage().applyErosion(value);
-			this.frame.repaint();
-		}
-	}
-	
-	public void commandApplyOpenning()
-	{
-		if (this.generatedImageDrawer != null)
-		{
-			String input = JOptionPane.showInputDialog("Quantidade de abertura (>= 1)");
-			int value = Integer.valueOf(input);
-			
-			this.generatedImageDrawer.getImage().applyOpenning(value);
-			this.frame.repaint();
-		}
-	}
-	
-	public void commandApplyClosing()
-	{
-		if (this.generatedImageDrawer != null)
-		{
-			String input = JOptionPane.showInputDialog("Quantidade de fechamento (>= 1)");
-			int value = Integer.valueOf(input);
-			
-			this.generatedImageDrawer.getImage().applyClosing(value);
-			this.frame.repaint();
-		}
-	}
-	
-	public void commandApplySpecification()
-	{
-		if (this.generatedImageDrawer != null)
-		{
-			String input = JOptionPane.showInputDialog("Imagem do histograma especificado.");
-			
-			if (input != null)
-			{
-				try {
-					int[] histogram = new PGM(input).getHistogram();
-					this.generatedImageDrawer.getImage().applyHistogramSpecification(histogram);
-					this.frame.repaint();
-				} catch (FileNotFoundException e) {
-					JOptionPane.showMessageDialog(null, "Arquivo n√£o encontrado.", "Erro", JOptionPane.ERROR_MESSAGE);
-				}
-			}
-		}
-	}
-	
-	public void commandApplyFilter()
-	{
-		if (this.generatedImageDrawer != null)
-		{
-			String input = JOptionPane.showInputDialog("Tamanho do filtro?");
-			Integer filterSize = Integer.valueOf(input);
-			
-			int[][] filter = FilterEditor.getFilter(this.frame, "Filtro", filterSize);
-			
-			if (filter != null)
-			{
-				Object strategy = JOptionPane.showInputDialog(null, "Algor√≠tmo de tratamento de bordas", "Tratamento de bordas", JOptionPane.QUESTION_MESSAGE, null, getClassList("filterAlgorithms.conf"), null);
-				
-				if (strategy != null)
-				{
-					try {
-						@SuppressWarnings("unchecked")
-						BorderTreatmentStrategy algorithm = ((Class<? extends BorderTreatmentStrategy>) strategy).newInstance();
-						
-						this.generatedImageDrawer.getImage().applyFilter(filter, algorithm);
-						this.frame.repaint();
-					} catch (Exception e) {
-						JOptionPane.showMessageDialog(null, e.getMessage());
-					}
-				}
-			}
-		}
 	}
 
 }

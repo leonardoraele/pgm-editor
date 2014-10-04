@@ -1,15 +1,10 @@
 package aac.trabalho;
 
 import java.io.FileNotFoundException;
-import java.io.IOException;
 
-import javax.swing.JOptionPane;
-
-import aac.BinarityAlgorithm;
 import aac.PGM;
 import aac.gui.PGMGUI;
 import aac.impl.binarity.BalancedHistogramThresholding;
-import aac.impl.binarity.CenterOfHistogramBinarity;
 
 public class T2Q3 {
 	
@@ -29,28 +24,6 @@ public class T2Q3 {
 		
 		// Exibe a imagem
 		new PGMGUI(HW1);
-	}
-	
-	private static BinarityAlgorithm selectBinarityAlgorithm() throws InstantiationException, IllegalAccessException {
-		Object strategy = JOptionPane.showInputDialog(
-				null,
-				"Seleção de Estratégia",
-				"Algorítmo de binarização",
-				JOptionPane.QUESTION_MESSAGE,
-				null,
-				new Object[] {
-						// Classes que apareceção para escolha:
-						BalancedHistogramThresholding.class,
-						CenterOfHistogramBinarity.class
-				},
-				null
-			);
-		
-		@SuppressWarnings("unchecked")
-		Class<? extends BinarityAlgorithm> treatment =
-				(Class<? extends BinarityAlgorithm>) strategy;
-		
-		return treatment.newInstance();
 	}
 
 }

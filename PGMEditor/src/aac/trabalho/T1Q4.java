@@ -8,7 +8,7 @@ import aac.BinarityAlgorithm;
 import aac.PGM;
 import aac.gui.PGMGUI;
 import aac.impl.binarity.BalancedHistogramThresholding;
-import aac.impl.binarity.CenterOfHistogramBinarity;
+import aac.impl.binarity.CenterOfHistogramThresholding;
 
 public class T1Q4 {
 	
@@ -34,7 +34,7 @@ public class T1Q4 {
 				new Object[] {
 						// Classes que apareceção para escolha:
 						BalancedHistogramThresholding.class,
-						CenterOfHistogramBinarity.class
+						CenterOfHistogramThresholding.class
 				},
 				null
 			);
