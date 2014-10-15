@@ -528,9 +528,15 @@ public class PGM {
 	
 	/**
 	 * Aplica efeito de Abertura.
-	 * O efeito de abertura consiste em aplicar o efeito de eros√£o seguido do
-	 * efeito de dilata√ß√£o utilizando a mesma m√°scara.
+	 * O efeito de abertura consiste em aplicar o efeito de eros„o seguido do
+	 * efeito de dilataÁ„o utilizando a mesma m·scara.
 	 */
+	public void applyOpenning(boolean[][] mask)
+	{
+		this.applyErosion(mask);
+		this.applyDilatation(mask);
+	}
+	
 	public void applyOpenning(int value)
 	{
 		this.applyErosion(value);
@@ -539,9 +545,15 @@ public class PGM {
 
 	/**
 	 * Aplica efeito de Fechamento.
-	 * O efeito de fechamento consiste em aplicar o efeito de dilata√ß√£o seguido
-	 * do efeito de eros√£o utilizando a mesma m√°scara.
+	 * O efeito de fechamento consiste em aplicar o efeito de dilataÁ„o seguido
+	 * do efeito de eros„o utilizando a mesma m·scara.
 	 */
+	public void applyClosing(boolean[][] mask)
+	{
+		this.applyDilatation(mask);
+		this.applyErosion(mask);
+	}
+	
 	public void applyClosing(int value)
 	{
 		this.applyDilatation(value);
@@ -845,6 +857,16 @@ public class PGM {
 	 */
 	private int truncate(int pixel) {
 		return Math.max(Math.min(pixel, this.pixelLimit), 0);
+	}
+	
+	public BinarityComparison compareTo(PGM expected)
+	{
+		return PGM.compare(this, expected);
+	}
+	
+	public static BinarityComparison compare(PGM current, PGM expected)
+	{
+		return new BinarityComparison(current, expected);
 	}
 
 }

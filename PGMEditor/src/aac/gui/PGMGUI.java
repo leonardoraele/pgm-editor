@@ -1,6 +1,7 @@
 package aac.gui;
 
 import java.awt.BorderLayout;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -9,6 +10,7 @@ import java.util.LinkedList;
 import java.util.Scanner;
 
 import javax.swing.BoxLayout;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
@@ -51,6 +53,7 @@ public class PGMGUI {
 	
 	private static final String TITLE = "Aboshop";
 	private static final String LABEL_GENERATED_IMAGE = "Nova imagem";
+	private static final String BASE_DIRECTORY_FILES = "../tests";
 	
 	private JFrame frame;
 	private JPanel originalContainer;
@@ -175,11 +178,15 @@ public class PGMGUI {
 		return this.frame;
 	}
 	
-	private void commandNotSupported()
+	public void commandNotSupported()
 	{
 		JOptionPane.showMessageDialog(null, "This feature is not supported by PGMGUI yet.", "Information", JOptionPane.INFORMATION_MESSAGE);
 	}
 	
+	/**
+	 * Register the current image to the history list so it can be rescued when
+	 * ther user tries to 
+	 */
 	private void registerHistory()
 	{
 		PGM generatedImage = PGMGUI.this.generatedImageDrawer.getImage();
@@ -204,10 +211,14 @@ public class PGMGUI {
 	
 	public void commandLoad()
 	{
-		String input = JOptionPane.showInputDialog("Arquivo");
+		JFileChooser chooser = new JFileChooser(BASE_DIRECTORY_FILES);
+		int result = chooser.showOpenDialog(null);
 		
-		if (input != null)
+		if (result == JFileChooser.APPROVE_OPTION)
 		{
+			File file = chooser.getSelectedFile();
+			String input = file.getAbsolutePath();
+			
 			try {
 				this.load(new PGM(input));
 				
@@ -222,10 +233,14 @@ public class PGMGUI {
 	{
 		if (this.generatedImageDrawer != null && this.originalImageDrawer != null)
 		{
-			String input = JOptionPane.showInputDialog("Arquivo para salvar");
+			JFileChooser chooser = new JFileChooser(BASE_DIRECTORY_FILES);
+			int result = chooser.showSaveDialog(null);
 			
-			if (input != null)
+			if (result == JFileChooser.APPROVE_OPTION)
 			{
+				File file = chooser.getSelectedFile();
+				String input = file.getAbsolutePath();
+				
 				try {
 					PGM generatedImage = this.generatedImageDrawer.getImage();
 					generatedImage.export(input);
@@ -441,52 +456,42 @@ public class PGMGUI {
 	{
 		if (this.generatedImageDrawer != null)
 		{
-			String input = JOptionPane.showInputDialog("Quantidade de dilata√ß√£o (>= 1)");
+			Pair<Integer, Integer> pair = DoubleDialog.getIntegers(this.frame, "Tamanho da m·scara", "Width: ", "Height: ");
 			
-			if (input != null)
+			if (pair != null)
 			{
-				Integer value;
-				try {
-					value = Integer.valueOf(input);
-				} catch (NumberFormatException e) {
-					value = null;
-					
-					JOptionPane.showMessageDialog(null, e);
-				};
+				int[][] intMask = FilterDialog.getFilter(pair.getFirst(), pair.getSecond());
 				
-				if (value != null)
+				if (intMask != null)
 				{
 					this.registerHistory();
 					
-					this.generatedImageDrawer.getImage().applyDilatation(value);
+					boolean[][] booleanMask = mapToBoolean(intMask);
+					PGM image = this.generatedImageDrawer.getImage();
+					image.applyDilatation(booleanMask);
 					this.frame.repaint();
 				}
 			}
 		}
 	}
-	
+
 	public void commandApplyErosion()
 	{
 		if (this.generatedImageDrawer != null)
 		{
-			String input = JOptionPane.showInputDialog("Quantidade de eros√£o (>= 1)");
+			Pair<Integer, Integer> pair = DoubleDialog.getIntegers(this.frame, "Tamanho da m·scara", "Width: ", "Height: ");
 			
-			if (input != null)
+			if (pair != null)
 			{
-				Integer value;
-				try {
-					value = Integer.valueOf(input);
-				} catch (NumberFormatException e) {
-					value = null;
-					
-					JOptionPane.showMessageDialog(null, e);
-				};
+				int[][] intMask = FilterDialog.getFilter(pair.getFirst(), pair.getSecond());
 				
-				if (value != null)
+				if (intMask != null)
 				{
 					this.registerHistory();
 					
-					this.generatedImageDrawer.getImage().applyErosion(value);
+					boolean[][] booleanMask = mapToBoolean(intMask);
+					PGM image = this.generatedImageDrawer.getImage();
+					image.applyErosion(booleanMask);
 					this.frame.repaint();
 				}
 			}
@@ -497,24 +502,19 @@ public class PGMGUI {
 	{
 		if (this.generatedImageDrawer != null)
 		{
-			String input = JOptionPane.showInputDialog("Quantidade de abertura (>= 1)");
+			Pair<Integer, Integer> pair = DoubleDialog.getIntegers(this.frame, "Tamanho da m·scara", "Width: ", "Height: ");
 			
-			if (input != null)
+			if (pair != null)
 			{
-				Integer value;
-				try {
-					value = Integer.valueOf(input);
-				} catch (NumberFormatException e) {
-					value = null;
-					
-					JOptionPane.showMessageDialog(null, e);
-				};
+				int[][] intMask = FilterDialog.getFilter(pair.getFirst(), pair.getSecond());
 				
-				if (value != null)
+				if (intMask != null)
 				{
 					this.registerHistory();
 					
-					this.generatedImageDrawer.getImage().applyOpenning(value);
+					boolean[][] booleanMask = mapToBoolean(intMask);
+					PGM image = this.generatedImageDrawer.getImage();
+					image.applyOpenning(booleanMask);
 					this.frame.repaint();
 				}
 			}
@@ -525,24 +525,19 @@ public class PGMGUI {
 	{
 		if (this.generatedImageDrawer != null)
 		{
-			String input = JOptionPane.showInputDialog("Quantidade de fechamento (>= 1)");
+			Pair<Integer, Integer> pair = DoubleDialog.getIntegers(this.frame, "Tamanho da m·scara", "Width: ", "Height: ");
 			
-			if (input != null)
+			if (pair != null)
 			{
-				Integer value;
-				try {
-					value = Integer.valueOf(input);
-				} catch (NumberFormatException e) {
-					value = null;
-					
-					JOptionPane.showMessageDialog(null, e);
-				};
+				int[][] intMask = FilterDialog.getFilter(pair.getFirst(), pair.getSecond());
 				
-				if (value != null)
+				if (intMask != null)
 				{
 					this.registerHistory();
 					
-					this.generatedImageDrawer.getImage().applyClosing(value);
+					boolean[][] booleanMask = mapToBoolean(intMask);
+					PGM image = this.generatedImageDrawer.getImage();
+					image.applyClosing(booleanMask);
 					this.frame.repaint();
 				}
 			}
@@ -563,7 +558,7 @@ public class PGMGUI {
 					this.generatedImageDrawer.getImage().applyHistogramSpecification(histogram);
 					this.frame.repaint();
 				} catch (FileNotFoundException e) {
-					JOptionPane.showMessageDialog(null, "Arquivo n√£o encontrado.", "Erro", JOptionPane.ERROR_MESSAGE);
+					JOptionPane.showMessageDialog(null, "Arquivo n„o encontrado.", "Erro", JOptionPane.ERROR_MESSAGE);
 					this.rollBackHistory();
 				}
 			}
@@ -579,7 +574,7 @@ public class PGMGUI {
 			String input = JOptionPane.showInputDialog("Tamanho do filtro?");
 			Integer filterSize = Integer.valueOf(input);
 			
-			int[][] filter = FilterEditor.getFilter(this.frame, "Filtro", filterSize);
+			int[][] filter = FilterDialog.getFilter(this.frame, "Filtro", filterSize);
 			
 			if (filter != null)
 			{
@@ -611,6 +606,20 @@ public class PGMGUI {
 				}
 			}
 		}
+	}
+	
+	private boolean[][] mapToBoolean(int[][] intMask) {
+		boolean[][] result = new boolean[intMask.length][intMask[0].length];
+		
+		for (int y = 0; y < intMask.length; y++)
+		{
+			for (int x = 0; x < intMask[0].length; x++)
+			{
+				result[x][y] = intMask[x][y] != 0;
+			}
+		}
+		
+		return result;
 	}
 
 	private Class<?>[] getClassList(String filename)
